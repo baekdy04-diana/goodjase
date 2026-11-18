@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ErgoFit 작업환경 점검</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<!-- ============ 상단 내비게이션 ============ -->
+<header class="topbar">
+  <div class="container">
+    <a class="logo" href="#home">Ergo<span>Fit</span></a>
+    <nav class="nav" id="nav">
+      <a href="#home">메인</a>
+      <a href="#survey">설문</a>
+      <a href="#result">분석 결과</a>
+      <a href="#guide">개선 가이드</a>
+      <a href="#checklist">체크리스트·기록</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- ============ 1. 메인 페이지 ============ -->
+  <section class="page" id="page-home">
+    <div class="hero">
+      <div class="stack">
+        <h1>앉아 있는 자세,<br>3분이면 점검됩니다</h1>
+        <p class="lead">컴퓨터, 노트북, 책, 태블릿 어떤 작업이든 지금 자세가 몸 어디에 부담을 주는지 확인하고 먼저 고칠 세 가지를 받아 보세요.</p>
+        <div><a class="btn big" href="#survey">내 자세 점검 시작 →</a></div>
+        <div class="facts">
+          <span><strong>14문항</strong> · 약 3분</span>
+          <span><strong>RULA·ROSA</strong> 평가 항목 참고</span>
+          <span>기록은 <strong>내 브라우저에만</strong> 저장</span>
+        </div>
+        <p class="small muted" id="home-last"></p>
+      </div>
+      <div class="hero-figure figure" id="home-figure"></div>
+    </div>
+  </section>
+
+  <!-- ============ 2. 설문 페이지 ============ -->
+  <section class="page" id="page-survey">
+    <div class="stack">
+      <div>
+        <h2 id="survey-title"></h2>
+        <p class="muted small" id="survey-count"></p>
+      </div>
+      <div class="bar"><div id="survey-progress"></div></div>
+      <form class="card stack" id="survey-form"></form>
+      <p class="error" id="survey-error" role="alert"></p>
+      <div class="row">
+        <button class="btn ghost" id="btn-prev" type="button">이전</button>
+        <button class="btn" id="btn-next" type="button">다음</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3. 분석 결과 / 4. 개선 가이드 / 5. 체크리스트·기록 ============ -->
+  <section class="page" id="page-result"><div class="stack" id="result-body"></div></section>
+  <section class="page" id="page-guide"><div class="stack" id="guide-body"></div></section>
+  <section class="page" id="page-checklist"><div class="stack" id="checklist-body"></div></section>
+
+</main>
+
+<footer class="container">ErgoFit은 RULA·ROSA의 평가 항목을 참고해 만든 간이 자가 점검 도구입니다. 공식 평가 점수나 의료 진단을 대신하지 않습니다. 통증이 계속되면 전문가와 상담하세요.</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
