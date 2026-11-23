@@ -3,13 +3,25 @@
    ========================================================= */
 var STEPS = ['작업 방식과 시간', '목과 몸통', '시선과 화면', '의자와 하체', '팔과 손목', '불편한 신체 부위'];
 
-/* 분석 영역. meaning = 위험도가 높을 때 사용자에게 보여 줄 쉬운 설명 */
+/* ---------------------------------------------------------
+   분석 영역
+   - short  : 몸 그림에 붙는 짧은 이름
+   - meaning: 점수가 낮을 때 보여 줄 쉬운 설명
+   - parts  : 이 영역이 무리를 주는 몸 부위 (아래 BODY의 id)
+   - harm   : 몸 부위가 따로 없는 영역(작업 시간)의 설명
+   --------------------------------------------------------- */
 var CATEGORIES = [
-  { id: 'habit',   name: '작업 시간·휴식', meaning: '같은 자세로 오래 있어 근육이 쉴 틈이 부족합니다.' },
-  { id: 'posture', name: '목·몸통 자세',   meaning: '목과 몸통이 권장 각도에서 벗어나 목·허리 근육이 계속 긴장합니다.' },
-  { id: 'view',    name: '시선·화면',      meaning: '보는 대상의 높이·거리·빛 때문에 고개와 눈에 부담이 갑니다.' },
-  { id: 'seat',    name: '의자·하체',      meaning: '의자가 하체와 허리를 제대로 받쳐 주지 못하고 있습니다.' },
-  { id: 'arm',     name: '팔·손목',        meaning: '팔과 손목이 지지 없이 꺾이거나 들려 있습니다.' }
+  { id: 'habit',   name: '작업 시간·휴식', short: '시간·휴식', parts: [],
+    meaning: '같은 자세로 오래 있어 근육이 쉴 틈이 부족합니다.',
+    harm: '자세가 좋아도 오래 고정되면 근육이 계속 긴장하고 혈액순환이 줄어 목·허리·다리에 피로가 쌓입니다.' },
+  { id: 'posture', name: '목·몸통 자세',   short: '목·몸통',   parts: ['neck', 'back'],
+    meaning: '목과 몸통이 권장 각도에서 벗어나 목·허리 근육이 계속 긴장합니다.' },
+  { id: 'view',    name: '시선·화면',      short: '시선·화면', parts: ['eye'],
+    meaning: '보는 대상의 높이·거리·빛 때문에 고개와 눈에 부담이 갑니다.' },
+  { id: 'seat',    name: '의자·하체',      short: '의자·하체', parts: ['leg'],
+    meaning: '의자가 하체와 허리를 제대로 받쳐 주지 못하고 있습니다.' },
+  { id: 'arm',     name: '팔·손목',        short: '팔·손목',   parts: ['shoulder', 'wrist'],
+    meaning: '팔과 손목이 지지 없이 꺾이거나 들려 있습니다.' }
 ];
 
 /* 주로 보는 대상(첫 질문)에 따라 '높이 올리는 방법'을 다르게 안내합니다 */
@@ -24,7 +36,7 @@ var RAISE = [
    설문 질문
    - cat   : 속한 분석 영역 (null이면 점수에 넣지 않음)
    - short : 결과 화면에서 원인을 말할 때 쓰는 짧은 이름
-   - why   : 이 질문을 묻는 근거 (설문 화면에 표시)
+   - why   : 이 질문을 묻는 근거 (설문에서 '왜 묻나요?'를 누르면 보임)
    - pic   : 'pose' 또는 'wrist'이면 선택지마다 예시 그림을 그림
    - score : 0이면 권장 자세, 클수록 위험
    - tip   : 점수가 1 이상일 때의 개선 행동
@@ -57,7 +69,8 @@ var QUESTIONS = [
     why: 'RULA는 고개 숙임이 10° 이하일 때 가장 안전하게, 20° 이상이거나 뒤로 젖혀질 때 높은 위험으로 봅니다.',
     tip: { title: '고개를 20° 안쪽으로 세우기',
       risk: '고개를 20° 넘게 숙이거나 턱을 내밀면 목 뒤 근육과 목뼈 디스크가 받는 힘이 커져 목 통증과 긴장성 두통으로 이어질 수 있습니다.',
-      today: function (a) { return RAISE[a.device]; },
+      // 보는 높이도 문제라면 '높이 올리기'는 그쪽 행동에 나오므로, 여기서는 다른 행동을 안내합니다
+      today: function (a) { return a.view > 0 ? '턱을 살짝 당기고, 아래를 볼 때는 고개 대신 눈만 내려 봅니다.' : RAISE[a.device]; },
       daily: '턱을 뒤로 당겨 5초 버티기를 하루 10회 합니다.',
       check: '옆모습 사진에서 귀가 어깨 위에 오는지 봅니다.' },
     options: [{ label: '거의 세우고 있다', score: 0 }, { label: '조금 숙인다', score: 1 }, { label: '많이 숙인다', score: 2 }, { label: '턱을 내밀거나 들고 본다', score: 3 }] },
@@ -154,35 +167,48 @@ var QUESTIONS = [
 ];
 
 /* ---------------------------------------------------------
-   신체 부위: 통증 지도와 '불편 부위' 질문에 함께 씁니다
-   - qs   : 이 부위에 부담을 주는 질문들
-   - cats : 이 부위가 이미 불편하면 우선순위를 올릴 영역
-   - harm : 지금 자세를 유지할 때 생길 수 있는 문제
+   몸 부위: '불편한 부위' 질문과 결과 페이지 설명 창에 씁니다
+   - cats   : 이 부위가 이미 불편하면 고칠 순서를 앞당길 영역
+   - harm   : 지금 자세를 유지할 때 생길 수 있는 문제
+   - stretch: 개선 가이드에 보여 줄 스트레칭
    --------------------------------------------------------- */
 var BODY = [
-  { id: 'eye', label: '눈', qs: ['dist', 'glare', 'cont'], cats: ['view', 'habit'],
+  { id: 'eye', label: '눈', cats: ['view', 'habit'],
     harm: '초점 근육이 쉬지 못하고 눈 깜빡임이 줄어 눈 피로, 건조함, 두통이 생길 수 있습니다.',
     stretch: '20분마다 6m 이상 먼 곳을 20초 동안 바라봅니다.' },
-  { id: 'neck', label: '목', qs: ['neck', 'view', 'twist'], cats: ['posture', 'view'],
+  { id: 'neck', label: '목', cats: ['posture', 'view'],
     harm: '머리 무게를 목 뒤 근육이 계속 버텨 목 통증, 거북목, 긴장성 두통으로 이어질 수 있습니다.',
     stretch: '턱을 당긴 채 고개를 좌우로 천천히 기울여 15초씩 늘립니다.' },
-  { id: 'shoulder', label: '어깨', qs: ['elbow', 'twist', 'trunk'], cats: ['arm', 'posture'],
+  { id: 'shoulder', label: '어깨', cats: ['arm', 'posture'],
     harm: '어깨 근육이 팔 무게를 계속 들고 있어 뭉치고 결리며, 팔이 저릴 수 있습니다.',
     stretch: '양손을 등 뒤에서 깍지 끼고 가슴을 펴며 15초 버팁니다.' },
-  { id: 'back', label: '허리', qs: ['trunk', 'lumbar', 'cont'], cats: ['posture', 'seat'],
+  { id: 'back', label: '허리', cats: ['posture', 'seat'],
     harm: '허리 곡선이 무너져 디스크에 압력이 몰리고 허리 통증이 만성화될 수 있습니다.',
     stretch: '일어서서 양손을 허리에 대고 상체를 살짝 뒤로 젖혀 5초, 5회 반복합니다.' },
-  { id: 'wrist', label: '손목', qs: ['wrist', 'elbow'], cats: ['arm'],
+  { id: 'wrist', label: '손목', cats: ['arm'],
     harm: '손목 안 신경 통로가 눌려 손 저림이나 손목터널증후군, 힘줄 염증 위험이 커집니다.',
     stretch: '팔을 앞으로 뻗고 반대 손으로 손등을 몸 쪽으로 당겨 15초 버팁니다.' },
-  { id: 'leg', label: '다리', qs: ['feet', 'depth', 'cont'], cats: ['seat', 'habit'],
+  { id: 'leg', label: '다리', cats: ['seat', 'habit'],
     harm: '허벅지 아래와 무릎 뒤가 눌려 혈액순환이 줄고 다리가 붓거나 저릴 수 있습니다.',
     stretch: '앉은 채 한쪽 다리를 펴고 발끝을 몸 쪽으로 당겨 15초 버팁니다.' }
 ];
 
-/* 예시 응답: '예시 결과 보기'에서 사용 (PREV는 2주 전 기록 예시) */
-var SAMPLE      = { device: 1, hours: 2, cont: 2, neck: 2, trunk: 3, twist: 0, view: 3, dist: 2, glare: 1, feet: 0, depth: 0, lumbar: 1, elbow: 1, wrist: 2, pain: ['neck', 'eye'] };
-var SAMPLE_PREV = { device: 1, hours: 2, cont: 3, neck: 3, trunk: 3, twist: 1, view: 3, dist: 2, glare: 2, feet: 2, depth: 0, lumbar: 2, elbow: 1, wrist: 2, pain: ['neck', 'eye', 'back'] };
+/* ---------------------------------------------------------
+   점수 단계 4가지 (점수가 높을수록 좋음)
+   RULA가 결과를 4단계 조치 수준(수용 가능 · 추가 조사 · 곧 개선 · 즉시 개선)으로
+   나누는 방식을 본떴습니다. 구간 경계 85·65·40점은 ErgoFit이 정한 값이라 여기서 바꿀 수 있습니다.
+   cls 는 CSS의 색 이름(blue / green / yellow / red)과 같습니다.
+   --------------------------------------------------------- */
+var LEVELS = [
+  { min: 85, cls: 'blue',   text: '좋음',      advice: '지금 자세를 유지하세요.' },
+  { min: 65, cls: 'green',  text: '양호',      advice: '작은 부분만 손보면 됩니다.' },
+  { min: 40, cls: 'yellow', text: '주의',      advice: '가까운 시일 안에 고치는 것이 좋습니다.' },
+  { min: 0,  cls: 'red',    text: '개선 필요', advice: '바로 고쳐야 합니다.' }
+];
+
+/* 예시 응답: '예시 결과 보기'에서 사용 (SAMPLE_PREV는 2주 전 기록 예시) */
+var SAMPLE      = { device: 1, hours: 1, cont: 0, neck: 2, trunk: 1, twist: 0, view: 3, dist: 2, glare: 1, feet: 0, depth: 0, lumbar: 0, elbow: 1, wrist: 2, pain: ['neck', 'eye'] };
+var SAMPLE_PREV = { device: 1, hours: 2, cont: 3, neck: 3, trunk: 3, twist: 1, view: 3, dist: 2, glare: 2, feet: 2, depth: 0, lumbar: 1, elbow: 1, wrist: 2, pain: ['neck', 'eye', 'back'] };
 
 /* =========================================================
    B. 저장소: localStorage를 안전하게 읽고 쓰는 함수
@@ -202,17 +228,30 @@ function save(key, value) {
 /* =========================================================
    C. 분석 로직
    ========================================================= */
-function findQ(id) { return QUESTIONS.filter(function (q) { return q.id === id; })[0]; }
 function scoreOf(q, answers) { return q.options[answers[q.id]].score; }
 function maxOf(q) { return Math.max.apply(null, q.options.map(function (o) { return o.score; })); }
 
-function levelOf(value) {
-  if (value < 25) return { cls: 'ok', text: '양호' };
-  if (value < 60) return { cls: 'warn', text: '주의' };
-  return { cls: 'bad', text: '개선 필요' };
+/* 점수(0~100)가 어느 단계인지 찾습니다 */
+function levelOf(score) {
+  for (var i = 0; i < LEVELS.length; i++) {
+    if (score >= LEVELS[i].min) return LEVELS[i];
+  }
+  return LEVELS[LEVELS.length - 1];
+}
+/* 단계 색의 글자용 색 (노랑만 진한 글자색을 씁니다) */
+function inkOf(cls) { return cls === 'yellow' ? 'var(--yellow-ink)' : 'var(--' + cls + ')'; }
+
+/* 받침에 맞는 조사 붙이기: josa('어깨', '과', '와') → '어깨와', josa('목', '과', '와') → '목과' */
+function josa(word, withFinal, withoutFinal) {
+  var code = word.charCodeAt(word.length - 1) - 0xAC00;          // 한글 글자 번호
+  var hasFinal = code >= 0 && code <= 11171 && code % 28 !== 0;  // 받침이 있으면 true
+  return word + (hasFinal ? withFinal : withoutFinal);
 }
 
-/* 영역별 위험도(0~100)와 우선순위 계산 */
+/* 영역별 점수와 고칠 순서 계산
+   - risk    : 위험도 (높을수록 나쁨, 계산용)
+   - score   : 화면에 보여 주는 점수 = 100 - 위험도 (높을수록 좋음)
+   - priority: 고칠 순서. 이미 불편한 부위와 관련 있으면 10점씩 올립니다 */
 function analyze(answers) {
   var cats = CATEGORIES.map(function (cat) {
     var sum = 0, max = 0;
@@ -221,19 +260,20 @@ function analyze(answers) {
       sum += scoreOf(q, answers); max += maxOf(q);
     });
     var risk = Math.round(sum / max * 100);
-    // 이미 불편한 부위와 관련된 영역은 우선순위를 10점씩 올립니다
     var related = BODY.filter(function (b) { return answers.pain.indexOf(b.id) !== -1 && b.cats.indexOf(cat.id) !== -1; });
-    var priority = Math.min(100, risk + related.length * 10);
-    return { id: cat.id, name: cat.name, meaning: cat.meaning, risk: risk, priority: priority, level: levelOf(priority), pains: related };
+    return { id: cat.id, name: cat.name, short: cat.short, meaning: cat.meaning, parts: cat.parts, harm: cat.harm,
+             risk: risk, score: 100 - risk, level: levelOf(100 - risk),
+             priority: Math.min(100, risk + related.length * 10), pains: related };
   });
-  var avg = cats.reduce(function (t, c) { return t + c.risk; }, 0) / cats.length;
+  var avgRisk = cats.reduce(function (t, c) { return t + c.risk; }, 0) / cats.length;
+  var overall = Math.round(100 - avgRisk);
   var levels = {};
   cats.forEach(function (c) { levels[c.id] = c.level.cls; });
-  return { overall: Math.round(100 - avg), cats: cats, levels: levels,
+  return { overall: overall, level: levelOf(overall), cats: cats, levels: levels,
            sorted: cats.slice().sort(function (a, b) { return b.priority - a.priority; }) };
 }
 
-/* 개선 행동 목록. 위험한 것부터 정렬하고, 앞의 3개가 '핵심 실천 계획'이 됩니다.
+/* 개선 행동 목록. 위험한 것부터 정렬하고, 앞의 3개가 '먼저 고칠 3가지'가 됩니다.
    weight = 선택지 점수 + (이미 불편한 부위와 관련 있으면 0.5) */
 function getActions(answers, analysis) {
   var actions = [];
@@ -245,34 +285,18 @@ function getActions(answers, analysis) {
     var today = typeof q.tip.today === 'function' ? q.tip.today(answers) : q.tip.today;
     actions.push({ id: q.id, q: q, cat: cat, score: score, answer: q.options[answers[q.id]].label,
       weight: score + (cat.pains.length ? 0.5 : 0) + cat.priority / 1000,
-      must: score === 3 || (score === 2 && cat.pains.length > 0),
       title: q.tip.title, risk: q.tip.risk, today: today, daily: q.tip.daily, check: q.tip.check });
   });
   return actions.sort(function (a, b) { return b.weight - a.weight; });
 }
 
-/* 부위별 통증 위험: 0 없음 / 1 주의 / 2 높음 */
-function bodyRisk(answers) {
-  return BODY.map(function (b) {
-    var sum = 0, max = 0, causes = [];
-    b.qs.forEach(function (id) {
-      var q = findQ(id), s = scoreOf(q, answers);
-      sum += s; max += maxOf(q);
-      if (s > 0) causes.push(q.short + '(' + q.options[answers[id]].label + ')');
-    });
-    var ratio = sum / max;
-    var level = ratio < 0.2 ? 0 : ratio < 0.5 ? 1 : 2;
-    var reported = answers.pain.indexOf(b.id) !== -1;
-    if (reported && level === 0) level = 1;
-    return { id: b.id, label: b.label, harm: b.harm, level: level, reported: reported, causes: causes };
-  });
-}
-
 /* =========================================================
-   D. 그림 1: 앉은 자세 (옆모습 막대 사람)
-   a   : 응답 중 neck / trunk / view / feet 값(0~3)에 따라 자세가 바뀝니다
-   opt : levels(영역별 색), badges(번호 표시), focus(강조할 부분)
+   D. 그림
    ========================================================= */
+
+/* 그림 1: 앉은 자세 (옆모습 막대 사람)
+   a   : 응답 중 neck / trunk / view / feet 값(0~3)에 따라 자세가 바뀝니다
+   opt : levels(영역별 색 이름), badges(번호 표시), focus(강조할 부분) */
 function drawPose(a, opt) {
   opt = opt || {};
   var lv = opt.levels || {};
@@ -311,24 +335,21 @@ function drawPose(a, opt) {
   var target = view === 3 ? [330, 128] : [318, top + 8];
 
   function badge(x, y, n, cat) {
+    var textColor = lv[cat] === 'yellow' ? '#3B2F00' : '#fff';
     return '<circle cx="' + r(x) + '" cy="' + r(y) + '" r="12" fill="' + col(cat) + '" stroke="#fff" stroke-width="2"/>' +
-           '<text x="' + r(x) + '" y="' + r(y + 4.5) + '" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">' + n + '</text>';
+           '<text x="' + r(x) + '" y="' + r(y + 4.5) + '" text-anchor="middle" font-size="13" font-weight="700" fill="' + textColor + '">' + n + '</text>';
   }
 
   var svg = '<svg viewBox="0 0 420 290" role="img" aria-label="책상에 앉은 사람의 옆모습">' +
     '<line x1="20" y1="268" x2="400" y2="268" stroke="var(--line)" stroke-width="3"/>' +
-    /* 의자 */
     '<g stroke="var(--ink-soft)" stroke-width="7" stroke-linecap="round" fill="none">' +
       '<line x1="99" y1="100" x2="96" y2="188"/><line x1="96" y1="193" x2="172" y2="193"/>' +
       '<line x1="132" y1="197" x2="132" y2="258"/><line x1="104" y1="262" x2="160" y2="262"/></g>' +
-    /* 책상과 키보드 */
     '<rect x="205" y="160" width="185" height="9" rx="3" fill="var(--accent-dark)"/>' +
     '<rect x="374" y="169" width="8" height="97" fill="var(--accent-dark)"/>' +
     '<rect x="224" y="153" width="44" height="6" rx="2" fill="var(--ink-soft)"/>' +
     screen +
-    /* 시선 */
     '<line x1="' + r(nose.x) + '" y1="' + r(nose.y) + '" x2="' + target[0] + '" y2="' + target[1] + '" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 5"/>' +
-    /* 사람 */
     '<g stroke="var(--ink)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none">' +
       '<line stroke="' + col('posture') + '" x1="' + r(sh.x) + '" y1="' + r(sh.y) + '" x2="' + hipX + '" y2="' + hipY + '"/>' +
       '<line stroke="' + (opt.focus === 'neck' ? 'var(--accent)' : col('posture')) + '" stroke-width="9" x1="' + r(sh.x) + '" y1="' + r(sh.y) + '" x2="' + r(hd.x) + '" y2="' + r(hd.y) + '"/>' +
@@ -354,64 +375,192 @@ function drawWrist(i) {
   return '<svg viewBox="0 0 120 64" role="img" aria-label="손목 각도 예시">' +
     '<line x1="0" y1="54" x2="120" y2="54" stroke="var(--line)" stroke-width="3"/>' +
     '<rect x="68" y="44" width="46" height="8" rx="2" fill="var(--ink-soft)"/>' +
-    (i === 3 ? '<rect x="38" y="41" width="30" height="13" fill="var(--accent-dark)"/><circle cx="60" cy="38" r="6" fill="var(--pain)" opacity="0.5"/>' : '') +
+    (i === 3 ? '<rect x="38" y="41" width="30" height="13" fill="var(--accent-dark)"/><circle cx="60" cy="38" r="6" fill="var(--red)" opacity="0.5"/>' : '') +
     '<line x1="8" y1="34" x2="62" y2="34" stroke="var(--ink)" stroke-width="10" stroke-linecap="round"/>' +
     '<line x1="62" y1="34" x2="' + hx.toFixed(1) + '" y2="' + hy.toFixed(1) + '" stroke="var(--accent)" stroke-width="9" stroke-linecap="round"/>' +
     '</svg>';
 }
 
-/* 그림 3: 통증 지도 (사람 모양 위에 빨간색으로 부담 부위 표시) */
-function drawBody(risks) {
-  // 부위별 빨간 영역의 위치: [중심x, 중심y, 가로반지름, 세로반지름]
-  var zones = {
-    eye: [[150, 36, 16, 8]], neck: [[150, 68, 14, 12]], shoulder: [[119, 88, 18, 13], [181, 88, 18, 13]],
-    back: [[150, 180, 30, 22]], wrist: [[83, 234, 13, 13], [217, 234, 13, 13]], leg: [[131, 318, 16, 44], [169, 318, 16, 44]]
-  };
-  var skin = 'var(--skin)';
-  var svg = '<svg viewBox="0 0 300 420" role="img" aria-label="통증이 생길 수 있는 부위를 빨간색으로 표시한 인체 그림">' +
-    '<defs><radialGradient id="painGrad"><stop offset="0" stop-color="var(--pain)" stop-opacity="1"/><stop offset="0.6" stop-color="var(--pain)" stop-opacity="0.75"/><stop offset="1" stop-color="var(--pain)" stop-opacity="0"/></radialGradient></defs>' +
-    /* 사람 모양: 다리 → 팔 → 몸통 → 목 → 머리 순서로 겹쳐 그립니다 */
-    '<g fill="none" stroke="' + skin + '" stroke-linecap="round" stroke-linejoin="round">' +
-      '<polyline stroke-width="34" points="133,212 131,290"/><polyline stroke-width="26" points="131,290 131,385"/>' +
-      '<polyline stroke-width="34" points="167,212 169,290"/><polyline stroke-width="26" points="169,290 169,385"/>' +
-      '<polyline stroke-width="21" points="110,94 95,165"/><polyline stroke-width="17" points="95,165 84,232"/>' +
-      '<polyline stroke-width="21" points="190,94 205,165"/><polyline stroke-width="17" points="205,165 216,232"/></g>' +
-    '<g fill="' + skin + '">' +
-      '<ellipse cx="128" cy="402" rx="15" ry="9"/><ellipse cx="172" cy="402" rx="15" ry="9"/>' +
-      '<ellipse cx="82" cy="249" rx="9" ry="14"/><ellipse cx="218" cy="249" rx="9" ry="14"/>' +
-      '<path d="M108,82 Q150,70 192,82 Q202,86 198,100 L184,150 Q181,178 187,214 Q150,226 113,214 Q119,178 116,150 L102,100 Q98,86 108,82 Z"/>' +
-      '<rect x="141" y="56" width="18" height="24" rx="6"/>' +
-      '<ellipse cx="150" cy="38" rx="20" ry="25"/></g>';
+/* 그림 3: 종합 점수 게이지 (빈 원 + 채워지는 원 + 가운데 숫자) */
+var GAUGE_LENGTH = 2 * Math.PI * 52;   // 게이지 원의 둘레 (반지름 52)
+function drawGauge(score, level) {
+  var len = GAUGE_LENGTH.toFixed(1);
+  return '<div class="gauge" data-gauge="' + score + '" role="img" aria-label="종합 점수 ' + score + '점, ' + level.text + '">' +
+    '<svg viewBox="0 0 120 120" aria-hidden="true">' +
+      '<circle cx="60" cy="60" r="52" fill="none" stroke="var(--track)" stroke-width="11"/>' +
+      '<circle class="gauge-arc" cx="60" cy="60" r="52" fill="none" stroke="var(--red)" stroke-width="11" stroke-linecap="round"' +
+      ' stroke-dasharray="' + len + '" stroke-dashoffset="' + len + '" transform="rotate(-90 60 60)"/></svg>' +
+    '<div class="gauge-center" aria-hidden="true"><span class="gauge-num">0</span><span class="gauge-max">/ 100점</span></div></div>';
+}
 
-  risks.forEach(function (rk) {
-    if (rk.level === 0) return;
-    var op = rk.level === 2 ? 0.95 : 0.5;
-    zones[rk.id].forEach(function (z) {
-      svg += '<ellipse cx="' + z[0] + '" cy="' + z[1] + '" rx="' + (z[2] + 4) + '" ry="' + (z[3] + 4) + '" fill="url(#painGrad)" opacity="' + op + '"/>';
+/* ---------------------------------------------------------
+   그림 4: 결과 페이지의 몸 그림 (영역별 점수와 몸 부위를 한 그림에)
+   영역마다 점수 단계 색으로 칠하고, 누르면 아래에서 설명 창이 올라옵니다.
+   - glows : 색을 칠할 타원 [중심x, 중심y, 가로반지름, 세로반지름]
+   - hits  : 누를 수 있는 투명한 사각형 [x, y, 너비, 높이] (손가락으로 누르기 쉽게 넉넉하게)
+   - label : 이름표. side 'right'는 오른쪽, 'left'는 왼쪽 / y 높이 / from 선이 시작하는 x
+   --------------------------------------------------------- */
+var ZONES = {
+  view:    { glows: [[170, 36, 24, 15]], hits: [[138, 4, 64, 60]], label: { side: 'right', y: 36, from: 196 } },
+  posture: { glows: [[170, 69, 15, 13], [170, 160, 30, 54]], hits: [[140, 64, 60, 168]], label: { side: 'right', y: 150, from: 205 } },
+  seat:    { glows: [[152, 292, 18, 58], [188, 292, 18, 58]], hits: [[128, 232, 84, 168]], label: { side: 'right', y: 300, from: 208 } },
+  arm:     { glows: [[139, 92, 16, 12], [201, 92, 16, 12], [104, 236, 13, 16], [236, 236, 13, 16]],
+             hits: [[86, 76, 54, 190], [200, 76, 54, 190]], label: { side: 'left', y: 236, from: 88 } },
+  habit:   { clock: [50, 52] }
+};
+/* 불편하다고 답한 부위에 찍는 '!' 표시 위치 */
+var PAIN_MARKS = { eye: [192, 18], neck: [188, 62], shoulder: [214, 82], back: [192, 200], wrist: [250, 222], leg: [207, 262] };
+/* 단계별로 색을 얼마나 진하게 칠할지 */
+var GLOW = { red: 1, yellow: 0.95, green: 0.6, blue: 0.5 };
+
+function drawZones(a, answers) {
+  var defs = LEVELS.map(function (lv) {
+    var c = 'var(--' + lv.cls + ')';
+    return '<radialGradient id="glow-' + lv.cls + '"><stop offset="0" stop-color="' + c + '" stop-opacity="0.95"/>' +
+      '<stop offset="0.6" stop-color="' + c + '" stop-opacity="0.55"/><stop offset="1" stop-color="' + c + '" stop-opacity="0"/></radialGradient>';
+  }).join('');
+
+  /* 사람 모양: 다리 → 팔 → 발·손 → 몸통 → 목 → 머리 순서로 겹쳐 그립니다 */
+  var svg = '<svg viewBox="0 0 340 420" aria-label="영역별 점수를 색으로 표시한 몸 그림">' + '<defs>' + defs + '</defs>' +
+    '<g fill="none" stroke="var(--skin)" stroke-linecap="round" stroke-linejoin="round">' +
+      '<polyline stroke-width="34" points="153,212 151,290"/><polyline stroke-width="26" points="151,290 151,385"/>' +
+      '<polyline stroke-width="34" points="187,212 189,290"/><polyline stroke-width="26" points="189,290 189,385"/>' +
+      '<polyline stroke-width="21" points="130,94 115,165"/><polyline stroke-width="17" points="115,165 104,232"/>' +
+      '<polyline stroke-width="21" points="210,94 225,165"/><polyline stroke-width="17" points="225,165 236,232"/></g>' +
+    '<g fill="var(--skin)">' +
+      '<ellipse cx="148" cy="402" rx="15" ry="9"/><ellipse cx="192" cy="402" rx="15" ry="9"/>' +
+      '<ellipse cx="102" cy="249" rx="9" ry="14"/><ellipse cx="238" cy="249" rx="9" ry="14"/>' +
+      '<path d="M128,82 Q170,70 212,82 Q222,86 218,100 L204,150 Q201,178 207,214 Q170,226 133,214 Q139,178 136,150 L122,100 Q118,86 128,82 Z"/>' +
+      '<rect x="161" y="56" width="18" height="24" rx="6"/>' +
+      '<ellipse cx="170" cy="38" rx="20" ry="25"/></g>';
+
+  /* 점수 글자: 큰 숫자 + 작은 '점' */
+  function scoreText(x, y, anchor, c) {
+    return '<text x="' + x + '" y="' + y + '" text-anchor="' + anchor + '" fill="' + inkOf(c.level.cls) + '" font-weight="700">' +
+      '<tspan font-size="20">' + c.score + '</tspan><tspan font-size="14" dx="2">점</tspan></text>';
+  }
+
+  var first = a.sorted[0];
+  a.cats.forEach(function (c) {
+    var z = ZONES[c.id], cls = c.level.cls;
+    var hint = c.id === first.id && cls !== 'blue' ? ' hint' : '';
+    svg += '<g class="zone' + hint + '" data-zone="' + c.id + '" role="button" tabindex="0" aria-label="' + c.name + ' ' + c.score + '점, ' + c.level.text + '. 자세히 보기">';
+
+    if (c.id === 'habit') {   // 작업 시간은 몸 부위가 아니라서 시계로 표시합니다
+      var x = z.clock[0], y = z.clock[1];
+      svg += '<circle class="zone-ring" cx="' + x + '" cy="' + y + '" r="34" fill="transparent"/>' +
+        '<circle cx="' + x + '" cy="' + y + '" r="24" fill="var(--surface)" stroke="var(--' + cls + ')" stroke-width="6"/>' +
+        '<polyline points="' + x + ',' + (y - 13) + ' ' + x + ',' + y + ' ' + (x + 9) + ',' + (y + 6) + '" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>' +
+        '<text x="' + x + '" y="' + (y + 50) + '" text-anchor="middle" font-size="15" fill="var(--ink-soft)">' + c.short + '</text>' +
+        scoreText(x, y + 72, 'middle', c);
+    } else {
+      z.hits.forEach(function (h) {
+        svg += '<rect class="zone-ring" x="' + h[0] + '" y="' + h[1] + '" width="' + h[2] + '" height="' + h[3] + '" rx="16" fill="transparent"/>';
+      });
+      z.glows.forEach(function (g) {
+        svg += '<ellipse cx="' + g[0] + '" cy="' + g[1] + '" rx="' + (g[2] + 6) + '" ry="' + (g[3] + 6) + '" fill="url(#glow-' + cls + ')" opacity="' + GLOW[cls] + '"/>';
+      });
+      var L = z.label;
+      if (L.side === 'right') {
+        svg += '<line x1="' + L.from + '" y1="' + L.y + '" x2="250" y2="' + L.y + '" stroke="var(--ink-soft)" stroke-width="1.2"/>' +
+          '<circle cx="' + L.from + '" cy="' + L.y + '" r="3" fill="var(--ink-soft)"/>' +
+          '<text x="256" y="' + (L.y - 4) + '" font-size="15" fill="var(--ink-soft)">' + c.short + '</text>' +
+          scoreText(256, L.y + 18, 'start', c);
+      } else {
+        svg += '<line x1="76" y1="' + L.y + '" x2="' + L.from + '" y2="' + L.y + '" stroke="var(--ink-soft)" stroke-width="1.2"/>' +
+          '<circle cx="' + L.from + '" cy="' + L.y + '" r="3" fill="var(--ink-soft)"/>' +
+          '<text x="72" y="' + (L.y - 4) + '" text-anchor="end" font-size="15" fill="var(--ink-soft)">' + c.short + '</text>' +
+          scoreText(72, L.y + 18, 'end', c);
+      }
+    }
+    // 불편하다고 답한 부위에 '!' 표시
+    c.parts.forEach(function (pid) {
+      if (answers.pain.indexOf(pid) === -1) return;
+      var m = PAIN_MARKS[pid];
+      svg += '<circle cx="' + m[0] + '" cy="' + m[1] + '" r="9" fill="var(--ink)" stroke="#fff" stroke-width="2"/>' +
+        '<text x="' + m[0] + '" y="' + (m[1] + 4) + '" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">!</text>';
     });
-    // 오른쪽에 부위 이름표
-    var last = zones[rk.id][zones[rk.id].length - 1];
-    svg += '<line x1="' + (last[0] + last[2]) + '" y1="' + last[1] + '" x2="246" y2="' + last[1] + '" stroke="var(--pain)" stroke-width="1.5"/>' +
-           '<text x="250" y="' + (last[1] + 5) + '" font-size="15" font-weight="700" fill="var(--pain)">' + rk.label + '</text>';
+    svg += '</g>';
   });
   return svg + '</svg>';
 }
 
 /* =========================================================
-   E. 화면 그리기 (페이지별 render 함수)
+   E. 움직임
+   - 막대  : HTML에 data-fill="목표값"을 적어 두면 0에서 그 값까지 늘어납니다
+             (세로 막대는 data-dir="up"을 함께 적습니다)
+   - 숫자  : data-count="목표값"을 적어 두면 0부터 그 값까지 올라갑니다
+   - 게이지: data-gauge="종합 점수"
+   컴퓨터에서 '애니메이션 효과'를 끈 사용자에게는 움직임 없이 바로 보여 줍니다.
+   ========================================================= */
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* 0에서 target까지 duration(밀리초) 동안 값을 올리면서, 화면이 바뀔 때마다 onStep(현재값)을 부릅니다 */
+function countUp(target, duration, onStep, onDone) {
+  if (reduceMotion) { onStep(target); if (onDone) onDone(); return; }
+  var start = null;
+  function frame(now) {
+    if (start === null) start = now;
+    var t = Math.min((now - start) / duration, 1);   // 진행률 0 → 1
+    var eased = 1 - Math.pow(1 - t, 3);              // 처음엔 빠르게, 끝에서 천천히
+    onStep(Math.round(target * eased));
+    if (t < 1) requestAnimationFrame(frame);
+    else if (onDone) onDone();
+  }
+  requestAnimationFrame(frame);
+}
+
+/* 종합 점수 게이지: 숫자가 올라가는 동안 색이 빨강 → 노랑 → 초록 → 파랑 순서로 바뀝니다 */
+function playGauge(gauge) {
+  var target = Number(gauge.getAttribute('data-gauge'));
+  var arc = gauge.querySelector('.gauge-arc');
+  var num = gauge.querySelector('.gauge-num');
+  countUp(target, 1600, function (value) {
+    var lv = levelOf(value);
+    num.textContent = value;
+    num.style.color = inkOf(lv.cls);
+    arc.style.stroke = 'var(--' + lv.cls + ')';
+    arc.style.strokeDashoffset = (GAUGE_LENGTH * (1 - value / 100)) + 'px';
+  }, function () { gauge.classList.add('landed'); });
+}
+
+/* root 안의 막대·숫자·게이지를 한꺼번에 움직입니다 (화면을 그린 직후에 부릅니다) */
+function playAnimations(root) {
+  var fills = root.querySelectorAll('[data-fill]');
+  void root.offsetHeight;   // 막대가 0인 상태를 먼저 그리게 합니다. 이 줄이 없으면 움직이지 않고 바로 나타납니다
+  Array.prototype.forEach.call(fills, function (el, i) {
+    var size = el.getAttribute('data-fill') + '%';
+    el.style.transitionDelay = (i % 8) * 0.08 + 's';   // 하나씩 차례로 출발
+    if (el.getAttribute('data-dir') === 'up') el.style.height = size;
+    else el.style.width = size;
+  });
+  Array.prototype.forEach.call(root.querySelectorAll('[data-count]'), function (el) {
+    countUp(Number(el.getAttribute('data-count')), 1200, function (value) { el.textContent = value; });
+  });
+  Array.prototype.forEach.call(root.querySelectorAll('[data-gauge]'), playGauge);
+}
+
+/* =========================================================
+   F. 공통 화면 조각
    ========================================================= */
 function $(id) { return document.getElementById(id); }
 function formatDate(iso) { var d = new Date(iso); return d.getFullYear() + '.' + (d.getMonth() + 1) + '.' + d.getDate(); }
+function shortDate(iso) { var d = new Date(iso); return (d.getMonth() + 1) + '.' + d.getDate(); }
 
-var SOURCES = '<div class="card stack tight"><h3>점검 기준의 근거</h3>' +
-  '<p class="small">질문과 점수는 아래 두 평가 도구의 항목과 기준 각도를 참고해 일반 사용자가 스스로 답할 수 있게 줄인 것입니다. 공식 평가 점수와 같지 않습니다.</p>' +
-  '<ul class="small muted"><li><strong>RULA</strong> (Rapid Upper Limb Assessment): 목, 몸통, 팔, 손목의 각도로 상체 부담을 평가합니다. McAtamney &amp; Corlett, Applied Ergonomics, 1993.</li>' +
-  '<li><strong>ROSA</strong> (Rapid Office Strain Assessment): 의자, 모니터, 키보드, 사용 시간으로 사무 작업환경을 평가합니다. Sonne, Villalta &amp; Andrews, Applied Ergonomics, 2012.</li></ul></div>';
-
+function pageHead(title, sub) {
+  return '<div class="page-head stack tight"><h1 class="page-title">' + title + '</h1>' + (sub ? '<p class="muted">' + sub + '</p>' : '') + '</div>';
+}
 function emptyState(message) {
-  return '<div class="card stack"><h2>아직 점검 결과가 없습니다</h2><p class="muted">' + message + '</p>' +
-         '<div class="row"><a class="btn" href="#survey">설문 시작하기</a>' +
-         '<button class="btn ghost" type="button" onclick="useSample()">예시 결과 보기</button></div></div>';
+  return '<div class="card stack"><div class="stack tight"><h2>아직 점검 결과가 없습니다</h2><p class="muted">' + message + '</p></div>' +
+    '<a class="btn block" href="#survey">점검 시작하기</a>' +
+    '<button class="btn ghost block" type="button" onclick="useSample()">예시 결과 보기</button></div>';
+}
+/* 단계 범례: ● 85~100 좋음  ● 65~84 양호  ● 40~64 주의  ● 0~39 개선 필요 */
+function levelLegend() {
+  return LEVELS.map(function (lv, i) {
+    var top = i === 0 ? 100 : LEVELS[i - 1].min - 1;
+    return '<span><i class="dot-lv ' + lv.cls + '"></i>' + lv.min + '~' + top + ' ' + lv.text + '</span>';
+  }).join('');
 }
 
 /* 점검 기록 한 건 만들기 */
@@ -420,7 +569,6 @@ function makeRecord(answers, date) {
   a.cats.forEach(function (c) { risks[c.id] = c.risk; });
   return { date: date.toISOString(), overall: a.overall, risks: risks, answers: answers };
 }
-
 /* 예시 보기: 응답을 채우고, 기록이 비어 있으면 2주 전·오늘 예시 기록 두 건을 넣습니다 */
 function useSample() {
   save('answers', SAMPLE);
@@ -431,19 +579,34 @@ function useSample() {
   render();
 }
 
-/* ---------- 1. 메인 ---------- */
+/* =========================================================
+   G. 페이지별 화면
+   ========================================================= */
+
+/* ---------- 1. 홈 ---------- */
 function renderHome() {
-  $('home-figure').innerHTML = drawPose({}, { levels: { habit: 'ok', posture: 'ok', view: 'ok', seat: 'ok', arm: 'ok' }, badges: true }) +
-    '<p class="small muted">점검하는 다섯 곳: ① 시간·휴식 ② 목·몸통 ③ 시선·화면 ④ 의자·하체 ⑤ 팔·손목</p>';
+  var brand = { habit: 'accent', posture: 'accent', view: 'accent', seat: 'accent', arm: 'accent' };
+  $('home-figure').innerHTML = drawPose({}, { levels: brand, badges: true }) +
+    '<p class="caption">점검하는 다섯 곳: ① 시간·휴식 ② 목·몸통 ③ 시선·화면 ④ 의자·하체 ⑤ 팔·손목</p>';
   var history = load('history', []);
-  $('home-last').textContent = history.length
-    ? '마지막 점검: ' + formatDate(history[history.length - 1].date) + ' · 종합 ' + history[history.length - 1].overall + '점'
-    : '';
+  var last = history[history.length - 1];
+  if (!last) { $('home-last').innerHTML = ''; return; }
+  var lv = levelOf(last.overall);
+  $('home-last').innerHTML = '<div class="card between"><div class="stack tight"><p class="caption">지난 점검 · ' + formatDate(last.date) + '</p>' +
+    '<p class="return-score"><b class="txt ' + lv.cls + '">' + last.overall + '</b>점 <span class="pill ' + lv.cls + '">' + lv.text + '</span></p></div>' +
+    '<a class="btn ghost" href="#result">결과 보기</a></div>';
 }
 
 /* ---------- 2. 설문 ---------- */
-var currentStep = 0;
-var draft = {};
+var currentStep = 0;   // 지금 보고 있는 단계 (0부터 셈)
+var draft = {};        // 설문 중에 고른 답 (설문을 마치면 저장하고 비웁니다)
+
+/* 설문을 처음 상태로: 고른 답을 지우고 1단계로 돌아갑니다.
+   설문을 마쳤을 때와 홈으로 돌아왔을 때 부릅니다. 저장된 결과와 점검 기록은 지우지 않습니다. */
+function resetSurvey() {
+  draft = {};
+  currentStep = 0;
+}
 
 function optionPicture(q, i) {
   if (q.pic === 'wrist') return drawWrist(i);
@@ -457,17 +620,18 @@ function optionPicture(q, i) {
 
 function renderSurvey() {
   $('survey-title').textContent = STEPS[currentStep];
-  $('survey-count').textContent = (currentStep + 1) + ' / ' + STEPS.length + ' 단계';
+  $('survey-count').textContent = (currentStep + 1) + ' / ' + STEPS.length;
   $('survey-progress').style.width = ((currentStep + 1) / STEPS.length * 100) + '%';
   $('survey-error').textContent = '';
-  $('btn-prev').style.visibility = currentStep === 0 ? 'hidden' : 'visible';
+  $('btn-prev').hidden = currentStep === 0;
   $('btn-next').textContent = currentStep === STEPS.length - 1 ? '결과 보기' : '다음';
 
   var html = '';
   if (currentStep < STEPS.length - 1) {
     QUESTIONS.filter(function (q) { return q.step === currentStep; }).forEach(function (q) {
-      html += '<fieldset class="question"><legend>' + q.text + '</legend>' +
-              '<p class="basis">왜 묻나요? ' + q.why + '</p><div class="options' + (q.pic ? ' pics' : '') + '">';
+      html += '<fieldset class="card question"><legend>' + q.text + '</legend>' +
+              '<details class="why"><summary>왜 묻나요?</summary><p>' + q.why + '</p></details>' +
+              '<div class="options' + (q.pic ? ' pics' : '') + '">';
       q.options.forEach(function (o, i) {
         var checked = draft[q.id] === i ? ' checked' : '';
         html += '<label class="option"><input type="radio" id="' + q.id + '-' + i + '" name="' + q.id + '" value="' + i + '"' + checked + '>' +
@@ -476,8 +640,9 @@ function renderSurvey() {
       html += '</div></fieldset>';
     });
   } else {
-    html += '<fieldset class="question"><legend>최근 한 달 동안 불편했던 부위를 모두 고르세요. 없으면 그대로 넘어가세요.</legend>' +
-            '<p class="basis">왜 묻나요? 이미 불편한 부위와 관련된 영역을 먼저 고치도록 우선순위를 올립니다.</p><div class="options pics">';
+    html += '<fieldset class="card question"><legend>최근 한 달 동안 불편했던 부위를 모두 고르세요. 없으면 그대로 넘어가세요.</legend>' +
+            '<details class="why"><summary>왜 묻나요?</summary><p>이미 불편한 부위와 관련된 영역을 먼저 고치도록 순서를 앞당깁니다.</p></details>' +
+            '<div class="options pics">';
     BODY.forEach(function (b) {
       var checked = (draft.pain || []).indexOf(b.id) !== -1 ? ' checked' : '';
       html += '<label class="option"><input type="checkbox" id="pain-' + b.id + '" name="pain" value="' + b.id + '"' + checked + '><span>' + b.label + '</span></label>';
@@ -502,215 +667,403 @@ function collectStep() {
   return complete;
 }
 
+/* 고를 때마다 바로 draft에 기록합니다 (설문 도중 다른 페이지에 다녀와도 선택이 남도록) */
+$('survey-form').addEventListener('change', function () {
+  if (collectStep()) $('survey-error').textContent = '';
+});
+
 $('btn-next').addEventListener('click', function () {
-  if (!collectStep()) { $('survey-error').textContent = '모든 질문에 답한 뒤 다음으로 넘어가세요.'; return; }
+  if (!collectStep()) {
+    $('survey-error').textContent = '답하지 않은 질문이 있습니다.';
+    // 답하지 않은 첫 질문으로 화면을 옮겨 줍니다
+    var missing = Array.prototype.filter.call($('survey-form').querySelectorAll('fieldset'), function (f) {
+      return !f.querySelector('input:checked');
+    })[0];
+    if (missing) missing.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
+    return;
+  }
   if (currentStep < STEPS.length - 1) { currentStep++; renderSurvey(); window.scrollTo(0, 0); return; }
   // 마지막 단계: 응답 저장 + 점검 기록 추가 + 결과 페이지로 이동
   save('answers', draft);
   var history = load('history', []);
   history.push(makeRecord(draft, new Date()));
   save('history', history);
-  currentStep = 0;
+  resetSurvey();               // 다음 설문은 빈 상태로 시작합니다
   location.hash = 'result';
 });
 $('btn-prev').addEventListener('click', function () {
   collectStep();
-  if (currentStep > 0) { currentStep--; renderSurvey(); }
+  if (currentStep > 0) { currentStep--; renderSurvey(); window.scrollTo(0, 0); }
 });
 
-/* ---------- 3. 분석 결과 ---------- */
-/* 이전 점검과 비교하는 카드 (기록이 2건 이상일 때만) */
-function compareCard(history) {
-  if (history.length < 2) return '';
-  var prev = history[history.length - 2], now = history[history.length - 1];
-  var diff = now.overall - prev.overall;
-  var diffText = diff > 0 ? '<span class="delta-up">+' + diff + '점 좋아졌습니다</span>'
-               : diff < 0 ? '<span class="delta-down">' + diff + '점 낮아졌습니다</span>' : '점수가 같습니다';
-
-  var rows = CATEGORIES.map(function (c) {
-    var d = now.risks[c.id] - prev.risks[c.id];   // 위험도는 낮아질수록 좋음
-    var txt = d < 0 ? '<span class="delta-up">' + d + ' 개선</span>' : d > 0 ? '<span class="delta-down">+' + d + ' 악화</span>' : '변화 없음';
-    return '<tr class="num"><td>' + c.name + '</td><td>' + prev.risks[c.id] + '</td><td>' + now.risks[c.id] + '</td><td>' + txt + '</td></tr>';
-  }).join('');
-
-  function side(rec, title) {
-    return '<div class="figure stack tight"><p class="small muted">' + title + ' · ' + formatDate(rec.date) + '</p>' +
-           drawPose(rec.answers, { levels: analyze(rec.answers).levels }) +
-           '<p class="num"><strong style="font-size:1.5rem">' + rec.overall + '</strong> 점</p></div>';
-  }
-  return '<div class="card stack"><div class="cat-head"><h3>이전 점검과 비교</h3><span>' + diffText + '</span></div>' +
-         '<div class="compare">' + side(prev, '이전') + '<span class="arrow">→</span>' + side(now, '이번') + '</div>' +
-         '<div class="table-wrap"><table><thead><tr><th>영역</th><th>이전 위험도</th><th>이번 위험도</th><th>변화</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
-}
-
+/* ---------- 3. 결과: 종합 점수 + 몸 그림 + 먼저 고칠 3가지 ---------- */
 function renderResult() {
   var answers = load('answers', null);
-  if (!answers) { $('result-body').innerHTML = emptyState('설문을 마치면 영역별 위험도, 통증 예상 부위, 개선 우선순위가 여기에 표시됩니다.'); return; }
-  var a = analyze(answers);
-  var top = a.sorted[0];
-  var overallLevel = levelOf(100 - a.overall);
-  var summary = top.level.cls === 'ok' ? '모든 영역이 권장 기준에 가깝습니다.' : '가장 먼저 고칠 부분은 <strong>' + top.name + '</strong>입니다.';
-
-  // 영역별 우선순위 + 쉬운 말 피드백
-  var rows = a.sorted.map(function (c, i) {
-    var fb = c.level.cls === 'ok' ? '권장 기준에 가깝습니다. 지금 상태를 유지하세요.' : c.meaning;
-    if (c.pains.length) fb += ' 불편하다고 답한 ' + c.pains.map(function (p) { return p.label; }).join('·') + '과 관련이 있어 순위를 올렸습니다.';
-    return '<div class="cat-row"><div class="cat-head"><span><span class="rank">' + (i + 1) + '</span><strong>' + c.name + '</strong></span>' +
-           '<span class="pill ' + c.level.cls + '">' + c.level.text + '</span></div>' +
-           '<div class="bar"><div class="' + c.level.cls + '" style="width:' + Math.max(c.priority, 4) + '%"></div></div>' +
-           '<p class="small">' + fb + '</p><p class="small muted num">위험도 ' + c.risk + ' / 100</p></div>';
-  }).join('');
-
-  var legend = [['habit', '① 시간·휴식'], ['posture', '② 목·몸통'], ['view', '③ 시선·화면'], ['seat', '④ 의자·하체'], ['arm', '⑤ 팔·손목']]
-    .map(function (x) { return '<span class="pill ' + a.levels[x[0]] + '">' + x[1] + '</span>'; }).join(' ');
-
-  // 통증 지도
-  var risks = bodyRisk(answers);
-  var shown = risks.filter(function (rk) { return rk.level > 0; }).sort(function (x, y) { return y.level - x.level; });
-  var bodyList = shown.length ? shown.map(function (rk) {
-    return '<div class="body-item"><p><span class="dot' + (rk.level === 1 ? ' mild' : '') + '"></span><strong>' + rk.label + '</strong> ' +
-           '<span class="pill ' + (rk.level === 2 ? 'bad' : 'warn') + '">' + (rk.level === 2 ? '부담 큼' : '부담 있음') + '</span>' +
-           (rk.reported ? ' <span class="tag">이미 불편함</span>' : '') + '</p>' +
-           '<p class="small">' + rk.harm + '</p>' +
-           (rk.causes.length ? '<p class="small muted">원인이 된 응답: ' + rk.causes.join(', ') + '</p>' : '') + '</div>';
-  }).join('') : '<p class="muted">지금 자세에서는 특별히 부담이 몰리는 부위가 없습니다.</p>';
-
-  $('result-body').innerHTML =
-    '<div class="card result-top"><div><p class="muted small">종합 점수</p><p class="score-big num">' + a.overall + '<span class="small muted"> / 100</span></p>' +
-    '<span class="pill ' + overallLevel.cls + '">' + overallLevel.text + '</span></div>' +
-    '<div class="stack"><h2>' + summary + '</h2><p class="muted">점수가 높을수록 권장 자세에 가깝습니다.</p>' +
-    '<div class="row"><a class="btn" href="#guide">실천 계획 보기</a><a class="btn ghost" href="#survey">다시 점검하기</a></div></div></div>' +
-
-    '<div class="two-col"><div class="card stack figure"><h3>내 응답으로 그린 자세</h3>' + drawPose(answers, { levels: a.levels, badges: true }) + '<div class="row">' + legend + '</div></div>' +
-    '<div class="card"><h3>개선 우선순위</h3>' + rows + '</div></div>' +
-
-    '<div class="card stack"><div><h3>이 자세를 계속 유지하면</h3><p class="small muted">빨간색이 진할수록 부담이 큰 부위입니다. 통증을 진단하는 것이 아니라 자세가 부담을 주는 곳을 보여 줍니다.</p></div>' +
-    '<div class="body-grid"><div class="figure">' + drawBody(risks) + '</div><div>' + bodyList + '</div></div></div>' +
-
-    compareCard(load('history', [])) + SOURCES;
-}
-
-/* ---------- 4. 개선 가이드 ---------- */
-function renderGuide() {
-  var answers = load('answers', null);
-  if (!answers) { $('guide-body').innerHTML = emptyState('설문 응답에 맞춘 실천 계획이 여기에 표시됩니다.'); return; }
-  var actions = getActions(answers, analyze(answers));
-  var html = '';
-
-  if (!actions.length) {
-    html += '<div class="card soft"><h2>고칠 항목이 없습니다</h2><p>모든 응답이 권장 기준에 맞습니다. 2주 뒤 다시 점검해 유지되는지 확인하세요.</p></div>';
-  } else {
-    // 핵심 3가지 실천 계획
-    html += '<div class="card plan stack"><div><h2>먼저 고칠 ' + Math.min(3, actions.length) + '가지 실천 계획</h2>' +
-            '<p class="muted">위험 점수가 가장 높고 이미 불편한 부위와 관련된 행동을 골랐습니다. 2주 동안 이것만 지켜도 됩니다.</p></div><div>';
-    actions.slice(0, 3).forEach(function (act, i) {
-      html += '<div class="plan-item"><div class="plan-no">' + (i + 1) + '</div><div>' +
-              '<div class="cat-head"><h3>' + act.title + '</h3><span class="pill ' + (act.must ? 'bad' : 'warn') + '">' + (act.must ? '반드시 개선' : '우선 개선') + '</span></div>' +
-              '<p class="small">' + act.risk + '</p><p class="small muted">내 응답: ' + act.answer + '</p>' +
-              '<div class="plan-steps"><div><strong>오늘 (10분)</strong>' + act.today + '</div><div><strong>매일</strong>' + act.daily + '</div><div><strong>확인 방법</strong>' + act.check + '</div></div>' +
-              '</div></div>';
-    });
-    html += '</div><div class="row"><a class="btn" href="#checklist">체크리스트로 실천하기</a><span class="small muted">2주 뒤 재점검해 점수 변화를 확인하세요.</span></div></div>';
-
-    // 전체 행동 목록
-    html += '<div><h2>전체 개선 행동 ' + actions.length + '가지</h2><p class="muted">위험한 순서대로 정렬했습니다. 핵심 계획이 습관이 되면 다음 항목으로 넘어가세요.</p></div>';
-    actions.forEach(function (act, i) {
-      html += '<div class="card guide-item ' + act.cat.level.cls + ' stack tight"><div class="cat-head"><h3><span class="rank">' + (i + 1) + '</span>' + act.title +
-              (i < 3 ? ' <span class="tag">핵심</span>' : '') + '</h3><span class="pill ' + act.cat.level.cls + '">' + act.cat.name + '</span></div>' +
-              '<p class="small muted">내 응답: ' + act.answer + '</p><p>' + act.risk + '</p>' +
-              '<ul><li>' + act.today + '</li><li>' + act.daily + '</li></ul>' +
-              '<p class="basis">근거: ' + act.q.why + '</p></div>';
-    });
-  }
-
-  var pains = BODY.filter(function (b) { return answers.pain.indexOf(b.id) !== -1; });
-  if (pains.length) {
-    html += '<div class="card"><h3>불편 부위 스트레칭</h3><ul>' +
-            pains.map(function (p) { return '<li><strong>' + p.label + '</strong>: ' + p.stretch + '</li>'; }).join('') + '</ul></div>';
-  }
-  $('guide-body').innerHTML = html + SOURCES;
-}
-
-/* ---------- 5. 체크리스트·기록 ---------- */
-var clearArmed = false;
-
-function renderChecklist() {
-  var answers = load('answers', null);
-  var history = load('history', []);
-  var checks = load('checks', {});
-  var html = '';
-
   if (!answers) {
-    html += emptyState('설문을 마치면 실천 체크리스트가 만들어집니다.');
+    $('result-body').innerHTML = pageHead('결과') + emptyState('설문을 마치면 점수와 몸 어디에 무리가 가는지 여기에 나옵니다.');
+    return;
+  }
+  var a = analyze(answers);
+  var actions = getActions(answers, a);
+  var history = load('history', []);
+
+  // (1) 종합 점수
+  var allGood = a.cats.every(function (c) { return c.level.cls === 'blue'; });
+  var title = allGood ? '모든 영역이 권장 기준에 가깝습니다.' : '가장 먼저 고칠 부분은 <strong>' + a.sorted[0].name + '</strong>입니다.';
+  var delta = '';
+  if (history.length >= 2) {
+    var d = history[history.length - 1].overall - history[history.length - 2].overall;
+    delta = d > 0 ? '<p class="delta">지난 점검보다 ' + d + '점 올랐습니다</p>'
+          : d < 0 ? '<p class="delta down">지난 점검보다 ' + (-d) + '점 내려갔습니다</p>'
+          : '<p class="delta down">지난 점검과 점수가 같습니다</p>';
+  }
+  var scoreCard = '<div class="card score-card"><p class="caption">종합 점수</p>' + drawGauge(a.overall, a.level) +
+    '<span class="pill ' + a.level.cls + '">' + a.level.text + '</span>' +
+    '<h2>' + title + '</h2><p class="muted">' + a.level.advice + '</p>' + delta + '</div>';
+
+  // (2) 몸 그림: 영역을 누르면 설명 창
+  var bodyCard = '<div class="card stack"><div class="stack tight"><h2>몸 어디에 무리가 가나요?</h2>' +
+    '<p class="muted">색이 칠해진 부분이나 이름을 누르면 영역별 점수와 무리가 가는 이유가 나옵니다.</p></div>' +
+    '<div class="figure body-figure">' + drawZones(a, answers) + '</div>' +
+    '<div class="legend">' + levelLegend() + (answers.pain.length ? '<span><i class="pain-dot">!</i>불편하다고 답한 부위</span>' : '') + '</div></div>';
+
+  // (3) 먼저 고칠 3가지: 이름만 보여 주고 개선 가이드로 이어 줍니다
+  var nextCard;
+  if (!actions.length) {
+    nextCard = '<div class="card stack tight"><h2>고칠 항목이 없습니다</h2><p class="muted">모든 응답이 권장 기준에 맞습니다. 2주 뒤 다시 점검해 유지되는지 확인하세요.</p></div>';
   } else {
-    var actions = getActions(answers, analyze(answers));
-    var done = actions.filter(function (x) { return checks[x.id]; }).length;
-    var pct = actions.length ? Math.round(done / actions.length * 100) : 100;
-    html += '<div class="card stack"><div class="cat-head"><h2>실천 체크리스트</h2><span class="num"><strong>' + done + '</strong> / ' + actions.length + ' 완료</span></div>' +
-            '<div class="bar"><div style="width:' + pct + '%"></div></div><div>';
-    actions.forEach(function (act, i) {
-      var on = checks[act.id];
-      html += '<label class="check' + (on ? ' done' : '') + '"><input type="checkbox" id="check-' + act.id + '" data-id="' + act.id + '"' + (on ? ' checked' : '') + '>' +
-              '<span><span class="check-title"><strong>' + act.title + '</strong></span>' + (i < 3 ? ' <span class="tag">핵심</span>' : '') +
-              '<br><span class="small muted">' + act.cat.name + ' · ' + act.today + '</span></span></label>';
-    });
-    if (!actions.length) html += '<p class="muted">실천할 항목이 없습니다.</p>';
-    html += '</div><div class="row"><a class="btn" href="#survey">재점검하기</a><span class="small muted">재점검하면 분석 결과에서 이전 자세와 나란히 비교됩니다.</span></div></div>';
+    var top = actions.slice(0, 3);
+    nextCard = '<div class="card stack"><div class="stack tight"><h2>먼저 고칠 ' + top.length + '가지</h2><p class="muted">하는 방법은 개선 가이드에 있습니다.</p></div>' +
+      '<ol class="next-list">' + top.map(function (act, i) { return '<li><span class="rank">' + (i + 1) + '</span><span>' + act.title + '</span></li>'; }).join('') + '</ol>' +
+      '<a class="btn block" href="#guide">개선 가이드 보기</a></div>';
   }
 
-  html += '<div class="card stack"><h2>점검 기록</h2>';
-  if (!history.length) {
-    html += '<p class="muted">설문을 마칠 때마다 날짜와 점수가 여기에 쌓입니다.</p>';
-  } else {
-    html += '<div class="history-chart" aria-label="점검 회차별 종합 점수">' + history.map(function (h, i) {
-      return '<div class="col"><span class="num">' + h.overall + '</span><div class="v" style="height:' + h.overall + '%"></div><span>' + (i + 1) + '회</span></div>';
-    }).join('') + '</div>';
-    html += '<div class="table-wrap"><table><thead><tr><th>회차</th><th>날짜</th><th>종합 점수</th><th>이전 대비</th></tr></thead><tbody>';
-    history.forEach(function (h, i) {
-      var d = i === 0 ? null : h.overall - history[i - 1].overall;
-      var txt = d === null ? '–' : d > 0 ? '<span class="delta-up">+' + d + '</span>' : d < 0 ? '<span class="delta-down">' + d + '</span>' : '0';
-      html += '<tr class="num"><td>' + (i + 1) + '</td><td>' + formatDate(h.date) + '</td><td><strong>' + h.overall + '</strong></td><td>' + txt + '</td></tr>';
-    });
-    html += '</tbody></table></div>';
-    html += '<div class="row"><button class="btn danger" type="button" id="btn-clear">' + (clearArmed ? '한 번 더 누르면 모든 기록이 삭제됩니다' : '기록 모두 지우기') + '</button></div>';
-  }
-  $('checklist-body').innerHTML = html + '</div>';
+  $('result-body').innerHTML = pageHead('결과') + scoreCard + bodyCard + nextCard +
+    '<a class="btn ghost block" href="#survey">다시 점검하기</a>';
+  playAnimations($('result-body'));
 }
 
-$('checklist-body').addEventListener('change', function (event) {
-  var id = event.target.getAttribute('data-id');
+/* 몸 그림을 누르면: 영역 점수 + 무리가 가는 이유 + 원인이 된 응답 + 바로 할 일 + 개선 가이드로 가는 버튼 */
+function zoneSheet(catId) {
+  var answers = load('answers', null);
+  if (!answers) return '';
+  var a = analyze(answers), actions = getActions(answers, a);
+  var c = a.cats.filter(function (x) { return x.id === catId; })[0];
+  var cls = c.level.cls, good = cls === 'blue';
+  var parts = BODY.filter(function (b) { return c.parts.indexOf(b.id) !== -1; });
+  var reported = parts.filter(function (b) { return answers.pain.indexOf(b.id) !== -1; });
+  var causes = QUESTIONS.filter(function (q) { return q.cat === catId && scoreOf(q, answers) > 0; });
+  var mine = actions.filter(function (x) { return x.cat.id === catId; });
+
+  var html = '<div class="stack tight"><p class="caption">영역별 점수</p>' +
+    '<div class="between"><h2 id="sheet-title">' + c.name + '</h2><span class="pill ' + cls + '">' + c.level.text + '</span></div>' +
+    '<p class="sheet-score"><b class="txt ' + cls + '" data-count="' + c.score + '">0</b><span class="muted">/ 100점</span></p></div>' +
+    '<div class="bar"><div class="' + cls + '" data-fill="' + Math.max(c.score, 2) + '"></div></div>' +
+    '<p>' + (good ? '권장 기준에 가깝습니다. 지금 상태를 유지하세요.' : c.meaning) + '</p>';
+
+  if (reported.length) {
+    var names = reported.map(function (b) { return b.label; }).join('·');
+    html += '<p class="caption">불편하다고 답한 ' + josa(names, '과', '와') + ' 관련이 있어 고칠 순서를 앞당겼습니다.</p>';
+  }
+  if (!good) {
+    html += '<div class="stack tight"><h3>몸에 무리가 가는 이유</h3><ul class="reasons">' +
+      (parts.length ? parts.map(function (b) {
+        return '<li><strong>' + b.label + '</strong> ' + b.harm + (answers.pain.indexOf(b.id) !== -1 ? ' <span class="tag">불편하다고 답함</span>' : '') + '</li>';
+      }).join('') : '<li>' + c.harm + '</li>') + '</ul></div>';
+    html += '<div class="stack tight"><h3>원인이 된 응답</h3><ul class="causes">' +
+      causes.map(function (q) { return '<li><span class="muted">' + q.short + '</span><span>' + q.options[answers[q.id]].label + '</span></li>'; }).join('') + '</ul></div>';
+  }
+  if (mine.length) {
+    html += '<div class="today stack tight"><p class="caption">바로 할 수 있는 일</p><h3>' + mine[0].title + '</h3><p>' + mine[0].today + '</p></div>' +
+      '<button class="btn block" type="button" data-guide="' + catId + '">이 영역 개선 방법 ' + mine.length + '가지 보기</button>';
+  } else {
+    html += '<button class="btn ghost block" type="button" data-guide="all">개선 가이드 보기</button>';
+  }
+  return html;
+}
+
+/* ---------- 설명 창 열고 닫기 ---------- */
+var sheetTimer = null, sheetReturnFocus = null;
+function openSheet(html) {
+  var sheet = $('sheet'), back = $('sheet-backdrop');
+  clearTimeout(sheetTimer);
+  $('sheet-body').innerHTML = html;
+  sheetReturnFocus = document.activeElement;
+  sheet.hidden = false; back.hidden = false;
+  void sheet.offsetHeight;                 // 닫힌 위치를 먼저 그린 뒤 올라오게 합니다
+  sheet.classList.add('open'); back.classList.add('open');
+  document.body.style.overflow = 'hidden'; // 뒤 화면이 같이 스크롤되지 않게
+  sheet.scrollTop = 0;
+  sheet.focus();
+  playAnimations($('sheet-body'));
+}
+function closeSheet(instant) {
+  var sheet = $('sheet'), back = $('sheet-backdrop');
+  if (sheet.hidden) return;
+  sheet.classList.remove('open'); back.classList.remove('open');
+  document.body.style.overflow = '';
+  function hide() { sheet.hidden = true; back.hidden = true; }
+  if (instant || reduceMotion) hide(); else sheetTimer = setTimeout(hide, 350);
+  if (!instant && sheetReturnFocus) sheetReturnFocus.focus();
+}
+$('sheet-close').addEventListener('click', function () { closeSheet(); });
+$('sheet-backdrop').addEventListener('click', function () { closeSheet(); });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
+
+/* 몸 그림의 영역을 누르거나, 키보드로 고르고 Enter·Space를 누르면 설명 창을 엽니다 */
+$('result-body').addEventListener('click', function (e) {
+  var zone = e.target.closest('[data-zone]');
+  if (zone) openSheet(zoneSheet(zone.getAttribute('data-zone')));
+});
+$('result-body').addEventListener('keydown', function (e) {
+  var zone = e.target.closest('[data-zone]');
+  if (zone && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openSheet(zoneSheet(zone.getAttribute('data-zone'))); }
+});
+/* 설명 창의 '개선 방법 보기' → 개선 가이드에서 그 영역만 골라 보여 줍니다 */
+$('sheet-body').addEventListener('click', function (e) {
+  var btn = e.target.closest('[data-guide]');
+  if (!btn) return;
+  guideFilter = btn.getAttribute('data-guide');
+  guideJump = guideFilter !== 'all';
+  location.hash = 'guide';
+});
+
+/* ---------- 4. 개선 가이드: 먼저 고칠 3가지 + 영역별 개선 방법 ---------- */
+var guideFilter = 'all';   // 지금 고른 영역 ('all'은 전체)
+var guideJump = false;     // 설명 창에서 넘어왔으면 '영역별 개선 방법'으로 바로 이동
+
+/* 개선 행동 카드 하나 */
+function actionCard(act) {
+  return '<div class="card stack tight"><h3>' + act.title + '</h3>' +
+    '<p class="caption">' + act.cat.name + ' · 내 응답: ' + act.answer + '</p>' +
+    '<div class="today"><p class="caption">오늘 할 일</p><p>' + act.today + '</p></div>' +
+    '<details class="more"><summary>왜 고쳐야 하나요?</summary><div class="stack tight"><p>' + act.risk + '</p>' +
+    '<p><strong>매일</strong> ' + act.daily + '</p><p><strong>확인 방법</strong> ' + act.check + '</p>' +
+    '<p class="basis">근거: ' + act.q.why + '</p></div></details></div>';
+}
+
+function renderGuide() {
+  var head = pageHead('개선 가이드', '위험한 것부터 정리했습니다. 위에서부터 하나씩 해 보세요.');
+  var answers = load('answers', null);
+  if (!answers) { $('guide-body').innerHTML = head + emptyState('설문을 마치면 나에게 맞는 개선 방법이 여기에 나옵니다.'); return; }
+  var a = analyze(answers), actions = getActions(answers, a);
+
+  // (1) 먼저 고칠 3가지
+  var plan;
+  if (!actions.length) {
+    plan = '<div class="card soft stack tight"><h2>고칠 항목이 없습니다</h2><p>모든 응답이 권장 기준에 맞습니다. 2주 뒤 다시 점검해 유지되는지 확인하세요.</p></div>';
+  } else {
+    var top = actions.slice(0, 3);
+    plan = '<div class="stack tight"><h2>먼저 고칠 ' + top.length + '가지</h2><p class="muted">위험 점수가 가장 높고 이미 불편한 부위와 관련된 행동입니다. 2주 동안 이것부터 지켜 보세요.</p></div>' +
+      top.map(function (act, i) {
+        return '<div class="card stack tight"><div class="plan-top"><span class="plan-no">' + (i + 1) + '</span>' +
+          '<div class="stack tight"><h3>' + act.title + '</h3><p class="caption">' + act.cat.name + ' · 내 응답: ' + act.answer + '</p></div></div>' +
+          '<p>' + act.risk + '</p>' +
+          '<div class="today"><p class="caption">오늘 할 일</p><p>' + act.today + '</p></div>' +
+          '<details class="more"><summary>매일 할 일과 확인 방법</summary><div class="stack tight">' +
+          '<p><strong>매일</strong> ' + act.daily + '</p><p><strong>확인 방법</strong> ' + act.check + '</p>' +
+          '<p class="basis">근거: ' + act.q.why + '</p></div></details></div>';
+      }).join('');
+  }
+
+  // (2) 영역별 개선 방법: 영역 버튼(칩)으로 고르기
+  var chips = [{ id: 'all', name: '전체', n: actions.length }].concat(a.sorted.map(function (c) {
+    return { id: c.id, name: c.name, n: actions.filter(function (x) { return x.cat.id === c.id; }).length };
+  }));
+  var list = '<section class="stack" id="guide-list"><div class="stack tight"><h2>영역별 개선 방법</h2><p class="muted">영역을 고르면 그 영역의 행동만 보입니다.</p></div>' +
+    '<div class="chips" role="group" aria-label="영역 고르기">' + chips.map(function (ch) {
+      return '<button type="button" class="chip" data-filter="' + ch.id + '" aria-pressed="' + (ch.id === guideFilter) + '">' + ch.name + '<span class="num"> ' + ch.n + '</span></button>';
+    }).join('') + '</div><div class="stack" id="guide-list-body"></div></section>';
+
+  // (3) 불편 부위 스트레칭 + 근거 (근거는 눌러야 펼쳐짐)
+  var pains = BODY.filter(function (b) { return answers.pain.indexOf(b.id) !== -1; });
+  var stretch = pains.length ? '<div class="card stack tight"><h2>불편 부위 스트레칭</h2><ul>' +
+    pains.map(function (p) { return '<li><strong>' + p.label + '</strong> ' + p.stretch + '</li>'; }).join('') + '</ul></div>' : '';
+  var sources = '<details class="card more"><summary>점검 기준의 근거</summary><div class="stack tight">' +
+    '<p>질문과 점수는 아래 두 평가 도구의 항목과 기준 각도를 참고해 일반 사용자가 스스로 답할 수 있게 줄인 것입니다. 공식 평가 점수와 같지 않습니다.</p>' +
+    '<ul class="caption"><li><strong>RULA</strong> (Rapid Upper Limb Assessment): 목, 몸통, 팔, 손목의 각도로 상체 부담을 평가합니다. McAtamney &amp; Corlett, Applied Ergonomics, 1993.</li>' +
+    '<li><strong>ROSA</strong> (Rapid Office Strain Assessment): 의자, 모니터, 키보드, 사용 시간으로 사무 작업환경을 평가합니다. Sonne, Villalta &amp; Andrews, Applied Ergonomics, 2012.</li>' +
+    '<li><strong>점수 색 4단계</strong>: RULA가 결과를 4단계 조치 수준(수용 가능 · 추가 조사 · 곧 개선 · 즉시 개선)으로 나누는 방식을 본떴습니다. 구간 경계(85·65·40점)는 ErgoFit이 정한 값입니다.</li></ul></div></details>';
+
+  $('guide-body').innerHTML = head + plan + list + stretch + sources + '<a class="btn block" href="#practice">실천 체크리스트로 가기</a>';
+  renderGuideList();
+  showPressedChip();
+}
+
+/* 고른 영역 버튼이 화면 밖에 있으면 옆으로 넘겨서 보이게 합니다 */
+function showPressedChip() {
+  var chip = $('guide-body').querySelector('.chip[aria-pressed="true"]');
+  if (chip) chip.parentNode.scrollLeft = chip.offsetLeft - chip.parentNode.offsetLeft - 16;
+}
+
+/* 고른 영역의 행동만 그립니다. '먼저 고칠 3가지'에 있는 행동은 이름만 */
+function renderGuideList() {
+  var answers = load('answers', null);
+  var actions = getActions(answers, analyze(answers));
+  var list = guideFilter === 'all' ? actions : actions.filter(function (x) { return x.cat.id === guideFilter; });
+  var html = list.length ? '' : '<div class="card soft"><p>이 영역은 고칠 항목이 없습니다. 지금 상태를 유지하세요.</p></div>';
+  list.forEach(function (act) {
+    var rank = actions.indexOf(act);
+    if (rank < 3) {
+      html += '<div class="card stack tight"><div class="between"><h3>' + act.title + '</h3><span class="tag">먼저 고칠 ' + (rank + 1) + '번</span></div>' +
+        '<p class="caption">' + act.cat.name + ' · 위의 먼저 고칠 3가지에 자세히 있습니다.</p></div>';
+    } else {
+      html += actionCard(act);
+    }
+  });
+  $('guide-list-body').innerHTML = html;
+}
+
+$('guide-body').addEventListener('click', function (e) {
+  var chip = e.target.closest('[data-filter]');
+  if (!chip) return;
+  guideFilter = chip.getAttribute('data-filter');
+  Array.prototype.forEach.call($('guide-body').querySelectorAll('[data-filter]'), function (b) {
+    b.setAttribute('aria-pressed', String(b === chip));
+  });
+  renderGuideList();
+  showPressedChip();
+});
+
+/* ---------- 5. 실천: 해 본 행동에 체크 ---------- */
+function renderPractice() {
+  var head = pageHead('실천', '해 본 행동에 체크하세요. 2주 뒤 다시 점검하면 변화가 기록됩니다.');
+  var answers = load('answers', null);
+  if (!answers) { $('practice-body').innerHTML = head + emptyState('설문을 마치면 실천할 행동 목록이 만들어집니다.'); return; }
+  var actions = getActions(answers, analyze(answers));
+  var checks = load('checks', {});
+  var done = actions.filter(function (x) { return checks[x.id]; }).length;
+  var pct = actions.length ? Math.round(done / actions.length * 100) : 100;
+
+  function row(act) {
+    var on = checks[act.id];
+    return '<label class="check' + (on ? ' done' : '') + '"><input type="checkbox" id="check-' + act.id + '" data-id="' + act.id + '"' + (on ? ' checked' : '') + '>' +
+      '<span class="stack tight"><span class="check-title">' + act.title + '</span><span class="caption">' + act.cat.name + ' · ' + act.today + '</span></span></label>';
+  }
+
+  var html = head + '<div class="card stack tight"><p class="caption">실천 중인 행동</p>' +
+    '<p class="big-count"><b class="num" id="check-count">' + done + '</b><span class="muted">/ ' + actions.length + '개</span></p>' +
+    '<div class="bar"><div id="check-bar" data-fill="' + pct + '"></div></div></div>';
+  if (!actions.length) {
+    html += '<div class="card soft"><p>실천할 항목이 없습니다. 지금 상태를 유지하세요.</p></div>';
+  } else {
+    html += '<div class="card stack tight"><h2>먼저 고칠 ' + Math.min(3, actions.length) + '가지</h2><div>' + actions.slice(0, 3).map(row).join('') + '</div></div>';
+    if (actions.length > 3) html += '<div class="card stack tight"><h2>그다음 할 일</h2><div>' + actions.slice(3).map(row).join('') + '</div></div>';
+  }
+  html += '<div class="card soft stack"><div class="stack tight"><h2>2주 뒤 다시 점검하기</h2><p>실천한 뒤 다시 점검하면 기록 페이지에서 점수 변화를 볼 수 있습니다.</p></div>' +
+    '<a class="btn block" href="#survey">다시 점검하기</a></div>';
+  $('practice-body').innerHTML = html;
+  playAnimations($('practice-body'));
+}
+
+/* 체크하면 화면 전체를 다시 그리지 않고 진행률만 바꿉니다 → 진행 막대가 부드럽게 움직입니다 */
+$('practice-body').addEventListener('change', function (e) {
+  var id = e.target.getAttribute('data-id');
   if (!id) return;
   var checks = load('checks', {});
-  checks[id] = event.target.checked;
+  checks[id] = e.target.checked;
   save('checks', checks);
-  renderChecklist();
+  var boxes = $('practice-body').querySelectorAll('input[data-id]');
+  var done = 0;
+  Array.prototype.forEach.call(boxes, function (box) {
+    box.closest('.check').classList.toggle('done', box.checked);
+    if (box.checked) done++;
+  });
+  $('check-count').textContent = done;
+  $('check-bar').style.width = Math.round(done / boxes.length * 100) + '%';
 });
-$('checklist-body').addEventListener('click', function (event) {
-  if (event.target.id !== 'btn-clear') return;
-  if (clearArmed) { save('history', []); clearArmed = false; } else { clearArmed = true; }
-  renderChecklist();
+
+/* ---------- 6. 기록: 점수 변화 + 지난 점검과 비교 + 목록 ---------- */
+var clearArmed = false;
+
+function renderRecord() {
+  var head = pageHead('기록', '점검할 때마다 점수가 쌓입니다.');
+  var history = load('history', []);
+  if (!history.length) { $('record-body').innerHTML = head + emptyState('설문을 마치면 날짜와 점수가 여기에 쌓입니다.'); return; }
+
+  // (1) 점수 변화 그래프
+  var chart = '<div class="card stack"><h2>점수 변화</h2><div class="history-chart" role="img" aria-label="점검 회차별 종합 점수">' +
+    history.map(function (h) {
+      var lv = levelOf(h.overall);
+      return '<div class="col"><div class="track"><div class="v ' + lv.cls + '" data-fill="' + Math.max(h.overall, 2) + '" data-dir="up">' +
+        '<b class="num txt ' + lv.cls + '" data-count="' + h.overall + '">0</b></div></div><span>' + shortDate(h.date) + '</span></div>';
+    }).join('') + '</div></div>';
+
+  // (2) 지난 점검과 비교 (기록이 2건 이상일 때)
+  var compare = '';
+  if (history.length >= 2) {
+    var prev = history[history.length - 2], now = history[history.length - 1];
+    var d = now.overall - prev.overall;
+    var lp = levelOf(prev.overall), ln = levelOf(now.overall);
+    var rows = CATEGORIES.map(function (c) {
+      var before = 100 - prev.risks[c.id], after = 100 - now.risks[c.id], diff = after - before;
+      return '<div class="cmp-row"><span>' + c.name + '</span>' +
+        '<span class="num"><span class="txt ' + levelOf(before).cls + '">' + before + '</span> → <strong class="txt ' + levelOf(after).cls + '">' + after + '</strong></span>' +
+        '<span class="change num' + (diff < 0 ? ' down' : '') + '">' + (diff > 0 ? '▲ ' + diff : diff < 0 ? '▼ ' + (-diff) : '–') + '</span></div>';
+    }).join('');
+    compare = '<div class="card stack"><div class="between"><h2>지난 점검과 비교</h2>' +
+      '<span class="delta' + (d < 0 ? ' down' : '') + '">' + (d > 0 ? d + '점 올랐습니다' : d < 0 ? (-d) + '점 내려갔습니다' : '변화 없음') + '</span></div>' +
+      '<div class="cmp-top"><div class="stack tight"><p class="caption">' + formatDate(prev.date) + '</p><b class="txt ' + lp.cls + '" data-count="' + prev.overall + '">0</b><span><span class="pill ' + lp.cls + '">' + lp.text + '</span></span></div>' +
+      '<span class="muted" aria-hidden="true">→</span>' +
+      '<div class="stack tight"><p class="caption">' + formatDate(now.date) + '</p><b class="txt ' + ln.cls + '" data-count="' + now.overall + '">0</b><span><span class="pill ' + ln.cls + '">' + ln.text + '</span></span></div></div>' +
+      (prev.answers && now.answers ? '<div class="poses figure"><div>' + drawPose(prev.answers, { levels: analyze(prev.answers).levels }) + '<p class="caption">이전 자세</p></div>' +
+        '<div>' + drawPose(now.answers, { levels: analyze(now.answers).levels }) + '<p class="caption">이번 자세</p></div></div>' : '') +
+      '<div>' + rows + '</div></div>';
+  }
+
+  // (3) 점검 목록 (최근 것이 위)
+  var list = '<div class="card stack tight"><h2>점검 목록</h2><div>' + history.slice().reverse().map(function (h, i) {
+    var lv = levelOf(h.overall);
+    return '<div class="rec-row"><span><strong>' + (history.length - i) + '회</strong> <span class="caption">' + formatDate(h.date) + '</span></span>' +
+      '<strong class="num txt ' + lv.cls + '">' + h.overall + '점</strong><span class="pill ' + lv.cls + '">' + lv.text + '</span></div>';
+  }).join('') + '</div></div>';
+
+  $('record-body').innerHTML = head + chart + compare + list +
+    '<button class="link-danger" type="button" id="btn-clear">기록 모두 지우기</button>';
+  playAnimations($('record-body'));
+}
+
+/* '기록 모두 지우기'는 실수를 막기 위해 두 번 눌러야 지워집니다 */
+$('record-body').addEventListener('click', function (e) {
+  if (e.target.id !== 'btn-clear') return;
+  if (!clearArmed) { clearArmed = true; e.target.textContent = '한 번 더 누르면 모든 기록이 삭제됩니다'; e.target.classList.add('armed'); return; }
+  save('history', []);
+  clearArmed = false;
+  renderRecord();
 });
 
 /* =========================================================
-   F. 페이지 전환: 주소 끝의 #이름 에 따라 해당 section만 보여 줍니다
+   H. 페이지 전환: 주소 끝의 #이름 에 따라 해당 section만 보여 줍니다
    ========================================================= */
-var PAGES = ['home', 'survey', 'result', 'guide', 'checklist'];
+var PAGES = ['home', 'survey', 'result', 'guide', 'practice', 'record'];
+var OLD_NAMES = { checklist: 'practice' };   // 예전 주소로 들어와도 새 페이지를 보여 줍니다
 
 function render() {
+  closeSheet(true);
   var name = location.hash.replace('#', '');
+  if (OLD_NAMES[name]) name = OLD_NAMES[name];
   if (PAGES.indexOf(name) === -1) name = 'home';
 
+  document.body.classList.toggle('focus', name === 'survey');   // 설문 중에는 메뉴 숨김
   PAGES.forEach(function (p) { $('page-' + p).classList.toggle('active', p === name); });
   Array.prototype.forEach.call($('nav').querySelectorAll('a'), function (a) {
-    a.classList.toggle('active', a.getAttribute('href') === '#' + name);
+    var on = a.getAttribute('data-page') === name;
+    a.classList.toggle('active', on);
+    if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
 
-  if (name === 'home') renderHome();
-  if (name === 'survey') { draft = JSON.parse(JSON.stringify(load('answers', {}))); renderSurvey(); }
+  if (name === 'guide' && !guideJump) guideFilter = 'all';   // 메뉴로 들어오면 '전체'부터
+
+  if (name === 'home') { resetSurvey(); renderHome(); }   // 홈으로 오면 진행 중이던 설문 선택도 지웁니다
+  if (name === 'survey') renderSurvey();
   if (name === 'result') renderResult();
   if (name === 'guide') renderGuide();
-  if (name === 'checklist') { clearArmed = false; renderChecklist(); }
-  window.scrollTo(0, 0);
+  if (name === 'practice') renderPractice();
+  if (name === 'record') { clearArmed = false; renderRecord(); }
+
+  var jumpTo = name === 'guide' && guideJump ? $('guide-list') : null;
+  guideJump = false;
+  if (jumpTo) jumpTo.scrollIntoView(); else window.scrollTo(0, 0);
 }
 
 window.addEventListener('hashchange', render);
